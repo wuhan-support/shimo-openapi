@@ -64,7 +64,11 @@ func obj2Map(doc *docResponse, title []string) ([]map[string]string, error) {
 func getTitle(title []interface{}, suffix string) []string {
 	r := make([]string, len(title))
 	for i, t := range title {
-		r[i] = strings.ToTitle(strings.Split(t.(string), suffix)[0])
+		if t != nil {
+			r[i] = strings.ToLower(strings.Split(t.(string), suffix)[0])
+		} else {
+			r[i] = ""
+		}
 	}
 	return r
 }
