@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"time"
+
+	"github.com/wuhan-support/shimo-openapi/transform"
 )
 
 const Endpoint = "https://api.shimo.im"
@@ -22,19 +23,25 @@ var client = http.Client{
 
 // NewClient initializes a new Client
 func NewClient(clientId string, clientSecret string, username string, password string, scope string) *Client {
-	return &Client{
-		clientId:clientId,
-		clientSecret:clientSecret,
-		username:username,
-		password:password,
-		scope:scope,
+	client := &Client{
+		clientId:     clientId,
+		clientSecret: clientSecret,
+		username:     username,
+		password:     password,
+		scope:        scope,
+		asyncSign:    make(chan sign, 10),
+		cache:        make(map[string]*Cache),
 	}
+
+	go client.receiveSign()
+
+	return client
 }
 
 // doOAuth receives oauth parameters, sends an OAuth request to the server, and returns the access key it got
 func (c *Client) doOAuth(v url.Values) (string, error) {
 	buf := bytes.NewBufferString(v.Encode())
-	req, err := http.NewRequest("POST", Endpoint + "/oauth/token", buf)
+	req, err := http.NewRequest("POST", Endpoint+"/oauth/token", buf)
 	if err != nil {
 		return "", nil
 	}
@@ -50,7 +57,7 @@ func (c *Client) doOAuth(v url.Values) (string, error) {
 	}
 	defer response.Body.Close()
 
-	//spew.Dump(response.Body)
+	// spew.Dump(response.Body)
 
 	if response.StatusCode != 200 {
 		i, _ := ioutil.ReadAll(response.Body)
@@ -64,7 +71,7 @@ func (c *Client) doOAuth(v url.Values) (string, error) {
 		return "", err
 	}
 
-	//spew.Dump(oauthCredentials)
+	// spew.Dump(oauthCredentials)
 
 	c.credential.accessToken = oauthCredentials.AccessToken
 	c.credential.accessTokenExpiresAt = time.Now().Add(TokenTTL)
@@ -118,7 +125,7 @@ func (c *Client) token() (string, error) {
 }
 
 // request sends request with token
-func (c *Client) request(r *http.Request) (io.Reader, error) {
+func (c *Client) request(r *http.Request) ([]byte, error) {
 	token, err := c.token()
 	if err != nil {
 		return nil, err
@@ -129,18 +136,107 @@ func (c *Client) request(r *http.Request) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Println(response.StatusCode, spew.Sdump(r), spew.Sdump(response.Status))
-	return response.Body, nil
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		i, _ := ioutil.ReadAll(response.Body)
+		return nil, fmt.Errorf("non-200 response received when getting docs: %v", i)
+	}
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response failed:%v", err)
+	}
+	return b, nil
 }
 
-// GetFileWithOpts gets a file from shimo.im with the specified fileId and Opts. It returns the response io.Reader which can be used to stream responses. The one using this method SHOULD cache the file content response from this method due to the limitation of shimo.im's API.
-func (c *Client) GetFileWithOpts(fileId string, opts Opts) (io.Reader, error) {
-	u := path.Join("/files", fileId, "sheets/values")
+func (c *Client) getFileFromAPI(fileID string, opts Opts) ([]byte, error) {
+	u := path.Join("/files", fileID, "sheets/values")
 	u = fmt.Sprintf("%s%s?range=%s!A1:%s%d", Endpoint, u, url.PathEscape(opts.SheetName), opts.EndCol, opts.EndRow)
 
 	request, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return c.request(request)
+	resp, err := c.request(request)
+	if err != nil {
+		return nil, err
+	}
+	return transform.Transform(resp)
+}
+
+func (c *Client) receiveSign() {
+	for sign := range c.asyncSign {
+		c.updateHandle(sign.FileID, sign.Opts)
+	}
+}
+
+func (c *Client) updateHandle(fileID string, opts Opts) error {
+	c.l.RLock()
+	cache, ok := c.cache[fileID]
+	c.l.RUnlock()
+	if ok &&
+		cache.expire.After(time.Now()) &&
+		opts.SheetName == cache.SheetName &&
+		opts.EndRow == cache.EndRow &&
+		opts.EndCol == cache.EndCol {
+
+		fmt.Println("updateHandle repeat")
+		return nil
+	}
+
+	_, err := c.updateOrCreateCache(fileID, opts)
+	return err
+}
+
+func (c *Client) updateOrCreateCache(fileID string, opts Opts) (*Cache, error) {
+	r, err := c.getFileFromAPI(fileID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	cache := &Cache{
+		expire: time.Now().Add(time.Second * 60),
+		Opts:   opts,
+		result: r,
+	}
+
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	c.cache[fileID] = cache
+	return cache, nil
+}
+
+// GetFileWithOpts gets a file from shimo.im with the specified fileID and Opts. It returns the response io.Reader which can be used to stream responses. The one using this method SHOULD cache the file content response from this method due to the limitation of shimo.im's API.
+func (c *Client) GetFileWithOpts(fileID string, opts Opts) ([]byte, error) {
+	c.l.RLock()
+	cache, ok := c.cache[fileID]
+	c.l.RUnlock()
+	if !ok {
+		cache, err := c.updateOrCreateCache(fileID, opts)
+		if err != nil {
+			return nil, err
+		}
+		return cache.result, nil
+	}
+
+	if cache.expire.After(time.Now()) &&
+		opts.SheetName == cache.SheetName &&
+		opts.EndRow == cache.EndRow &&
+		opts.EndCol == cache.EndCol {
+
+		return cache.result, nil
+	}
+
+	select {
+	case c.asyncSign <- sign{FileID: fileID, Opts: opts}:
+	case <-time.After(time.Millisecond * 10):
+		fmt.Println("send async update sign timeout")
+	}
+
+	return cache.result, nil
+}
+
+func (c *Client) Close() {
+	close(c.asyncSign)
 }
