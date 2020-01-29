@@ -22,7 +22,7 @@ var client = http.Client{
 }
 
 // NewClient initializes a new Client
-func NewClient(clientId string, clientSecret string, username string, password string, scope string, headerSuffix string) *Client {
+func NewClient(clientId string, clientSecret string, username string, password string, scope string) *Client {
 	client := &Client{
 		clientId:     clientId,
 		clientSecret: clientSecret,
@@ -31,7 +31,6 @@ func NewClient(clientId string, clientSecret string, username string, password s
 		scope:        scope,
 		asyncSign:    make(chan sign, 10),
 		cache:        make(map[string]*Cache),
-		HeaderSuffix: headerSuffix,
 	}
 
 	go client.receiveSign()
@@ -162,7 +161,7 @@ func (c *Client) getFileFromAPI(fileID string, opts Opts) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return transform.Transform(resp, c.HeaderSuffix)
+	return transform.Transform(resp, opts.HeaderSuffix)
 }
 
 func (c *Client) receiveSign() {
@@ -179,7 +178,8 @@ func (c *Client) updateHandle(fileID string, opts Opts) error {
 		cache.expire.After(time.Now()) &&
 		opts.SheetName == cache.SheetName &&
 		opts.EndRow == cache.EndRow &&
-		opts.EndCol == cache.EndCol {
+		opts.EndCol == cache.EndCol &&
+		opts.HeaderSuffix == cache.HeaderSuffix {
 
 		fmt.Println("updateHandle repeat")
 		return nil
@@ -224,7 +224,8 @@ func (c *Client) GetFileWithOpts(fileID string, opts Opts) ([]byte, error) {
 	if cache.expire.After(time.Now()) &&
 		opts.SheetName == cache.SheetName &&
 		opts.EndRow == cache.EndRow &&
-		opts.EndCol == cache.EndCol {
+		opts.EndCol == cache.EndCol &&
+		opts.HeaderSuffix == cache.HeaderSuffix {
 
 		return cache.result, nil
 	}

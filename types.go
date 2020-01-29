@@ -16,9 +16,6 @@ type Client struct {
 	l            sync.RWMutex
 	cache        map[string]*Cache
 
-	// the suffix in the header to be removed
-	HeaderSuffix string
-
 	credential struct {
 		accessToken          string
 		accessTokenExpiresAt time.Time
@@ -37,6 +34,8 @@ type Opts struct {
 	SheetName string `json:"sheet_name"`
 	EndRow    int    `json:"end_row"`
 	EndCol    string `json:"end_col"`
+	// the suffix in the header to be removed
+	HeaderSuffix    string `json:"header_suffix"`
 }
 
 type sign struct {

@@ -3,9 +3,8 @@ package transform
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
-
 	"github.com/shopspring/decimal"
+	"strings"
 )
 
 type docResponse struct {
@@ -53,7 +52,7 @@ func obj2Map(doc *docResponse, title []string) ([]map[string]string, error) {
 			case bool:
 				r[title[j]] = fmt.Sprintf("%t", t)
 			default:
-				r[title[j]] = nil
+				r[title[j]] = "null"
 			}
 		}
 		result = append(result, r)
@@ -65,7 +64,7 @@ func obj2Map(doc *docResponse, title []string) ([]map[string]string, error) {
 func getTitle(title []interface{}, suffix string) []string {
 	r := make([]string, len(title))
 	for i, t := range title {
-		r[i] = strings.Split(t.(string), suffix)[0]
+		r[i] = strings.ToTitle(strings.Split(t.(string), suffix)[0])
 	}
 	return r
 }
@@ -77,7 +76,7 @@ func removeEmpty(data []map[string]string, title []string) []map[string]string {
 	for _, row := range data {
 		empty = true
 		for _, v := range row {
-			if v != "" && v != nil {
+			if v != "" && v != "null" {
 				empty = false
 				break
 			}
@@ -92,7 +91,7 @@ func removeEmpty(data []map[string]string, title []string) []map[string]string {
 	for _, k := range title {
 		empty = true
 		for _, row := range tmpRow {
-			if row[k] != "" && row[k] != nil {
+			if row[k] != "" && row[k] != "null" {
 				empty = false
 				break
 			}
