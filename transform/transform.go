@@ -3,7 +3,6 @@ package transform
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/shopspring/decimal"
 	"strings"
 )
 
@@ -34,26 +33,13 @@ func Transform(data []byte, suffix string) ([]byte, error) {
 	return b, nil
 }
 
-func obj2Map(doc *docResponse, title []string) ([]map[string]string, error) {
-	result := make([]map[string]string, 0, len(doc.Values)-1)
+func obj2Map(doc *docResponse, title []string) ([]map[string]interface{}, error) {
+	result := make([]map[string]interface{}, 0, len(doc.Values)-1)
 
 	for i := 1; i < len(doc.Values); i++ {
-		r := make(map[string]string)
+		r := make(map[string]interface{})
 		for j := 0; j < len(doc.Values[i]); j++ {
-			switch t := doc.Values[i][j].(type) {
-			case float64:
-				decnum, err := decimal.NewFromString(fmt.Sprintf("%f", t))
-				if err != nil {
-					return nil, err
-				}
-				r[title[j]] = decnum.String()
-			case string:
-				r[title[j]] = t
-			case bool:
-				r[title[j]] = fmt.Sprintf("%t", t)
-			default:
-				r[title[j]] = "null"
-			}
+			r[title[j]] = doc.Values[i][j]
 		}
 		result = append(result, r)
 	}
@@ -73,14 +59,14 @@ func getTitle(title []interface{}, suffix string) []string {
 	return r
 }
 
-func removeEmpty(data []map[string]string, title []string) []map[string]string {
+func removeEmpty(data []map[string]interface{}, title []string) []map[string]interface{} {
 	var empty bool
 	// delete empty row
-	tmpRow := []map[string]string{}
+	tmpRow := []map[string]interface{}{}
 	for _, row := range data {
 		empty = true
 		for _, v := range row {
-			if v != "" && v != "null" {
+			if v != "" && v != nil {
 				empty = false
 				break
 			}
@@ -95,7 +81,7 @@ func removeEmpty(data []map[string]string, title []string) []map[string]string {
 	for _, k := range title {
 		empty = true
 		for _, row := range tmpRow {
-			if row[k] != "" && row[k] != "null" {
+			if row[k] != "" && row[k] != nil {
 				empty = false
 				break
 			}
@@ -106,7 +92,7 @@ func removeEmpty(data []map[string]string, title []string) []map[string]string {
 	}
 
 	// delete empty col
-	result := make([]map[string]string, len(tmpRow))
+	result := make([]map[string]interface{}, len(tmpRow))
 	for i, row := range tmpRow {
 		tmp := row
 		for _, k := range delCol {
