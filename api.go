@@ -20,6 +20,7 @@ var client = http.Client{
 	Timeout: time.Minute,
 }
 
+// NewClient initializes a new Client
 func NewClient(clientId string, clientSecret string, username string, password string, scope string) *Client {
 	return &Client{
 		clientId:clientId,
@@ -132,9 +133,7 @@ func (c *Client) request(r *http.Request) (io.Reader, error) {
 	return response.Body, nil
 }
 
-// GetFileWithOpts gets a file from shimo.im with the specified fileId and Opts. It returns the
-// response io.Reader which can be used to stream responses. The one using this method SHOULD
-// cache the file content response from this method due to the limitation of shimo.im's API.
+// GetFileWithOpts gets a file from shimo.im with the specified fileId and Opts. It returns the response io.Reader which can be used to stream responses. The one using this method SHOULD cache the file content response from this method due to the limitation of shimo.im's API.
 func (c *Client) GetFileWithOpts(fileId string, opts Opts) (io.Reader, error) {
 	u := path.Join("/files", fileId, "sheets/values")
 	u = fmt.Sprintf("%s%s?range=%s!A1:%s%d", Endpoint, u, url.PathEscape(opts.SheetName), opts.EndCol, opts.EndRow)
