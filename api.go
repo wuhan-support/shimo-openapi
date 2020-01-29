@@ -140,7 +140,7 @@ func (c *Client) request(r *http.Request) ([]byte, error) {
 
 	if response.StatusCode != http.StatusOK {
 		i, _ := ioutil.ReadAll(response.Body)
-		return nil, fmt.Errorf("non-200 response received when getting docs: %v", i)
+		return nil, fmt.Errorf("non-200 response received when getting docs: %v", string(i))
 	}
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
