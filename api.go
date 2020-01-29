@@ -61,7 +61,7 @@ func (c *Client) doOAuth(v url.Values) (string, error) {
 
 	if response.StatusCode != 200 {
 		i, _ := ioutil.ReadAll(response.Body)
-		return "", fmt.Errorf("non-200 response received when getting token: %v", i)
+		return "", fmt.Errorf("non-200 response received when getting token: %v", string(i))
 	}
 
 	var oauthCredentials oAuthResponse
