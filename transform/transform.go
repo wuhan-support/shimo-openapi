@@ -8,15 +8,11 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-var (
-	suffix = "（"
-)
-
 type docResponse struct {
 	Values [][]interface{} `json:"values,omitempty"`
 }
 
-func Transform(data []byte) ([]byte, error) {
+func Transform(data []byte, suffix string) ([]byte, error) {
 	doc := &docResponse{}
 	err := json.Unmarshal(data, doc)
 	if err != nil {
@@ -26,7 +22,7 @@ func Transform(data []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	title := getTitle(doc.Values[0])
+	title := getTitle(doc.Values[0], suffix)
 
 	rmap, err := obj2Map(doc, title)
 	if err != nil {
@@ -57,7 +53,7 @@ func obj2Map(doc *docResponse, title []string) ([]map[string]string, error) {
 			case bool:
 				r[title[j]] = fmt.Sprintf("%t", t)
 			default:
-				r[title[j]] = "null"
+				r[title[j]] = nil
 			}
 		}
 		result = append(result, r)
@@ -66,7 +62,7 @@ func obj2Map(doc *docResponse, title []string) ([]map[string]string, error) {
 	return result, nil
 }
 
-func getTitle(title []interface{}) []string {
+func getTitle(title []interface{}, suffix string) []string {
 	r := make([]string, len(title))
 	for i, t := range title {
 		r[i] = strings.Split(t.(string), suffix)[0]
@@ -81,7 +77,7 @@ func removeEmpty(data []map[string]string, title []string) []map[string]string {
 	for _, row := range data {
 		empty = true
 		for _, v := range row {
-			if v != "" && v != "null" {
+			if v != "" && v != nil {
 				empty = false
 				break
 			}
@@ -96,7 +92,7 @@ func removeEmpty(data []map[string]string, title []string) []map[string]string {
 	for _, k := range title {
 		empty = true
 		for _, row := range tmpRow {
-			if row[k] != "" && row[k] != "null" {
+			if row[k] != "" && row[k] != nil {
 				empty = false
 				break
 			}

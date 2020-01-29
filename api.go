@@ -22,7 +22,7 @@ var client = http.Client{
 }
 
 // NewClient initializes a new Client
-func NewClient(clientId string, clientSecret string, username string, password string, scope string) *Client {
+func NewClient(clientId string, clientSecret string, username string, password string, scope string, headerSuffix string) *Client {
 	client := &Client{
 		clientId:     clientId,
 		clientSecret: clientSecret,
@@ -31,6 +31,7 @@ func NewClient(clientId string, clientSecret string, username string, password s
 		scope:        scope,
 		asyncSign:    make(chan sign, 10),
 		cache:        make(map[string]*Cache),
+		HeaderSuffix: headerSuffix,
 	}
 
 	go client.receiveSign()
@@ -161,7 +162,7 @@ func (c *Client) getFileFromAPI(fileID string, opts Opts) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return transform.Transform(resp)
+	return transform.Transform(resp, c.HeaderSuffix)
 }
 
 func (c *Client) receiveSign() {

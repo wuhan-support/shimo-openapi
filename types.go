@@ -16,6 +16,9 @@ type Client struct {
 	l            sync.RWMutex
 	cache        map[string]*Cache
 
+	// the suffix in the header to be removed
+	HeaderSuffix string
+
 	credential struct {
 		accessToken          string
 		accessTokenExpiresAt time.Time
