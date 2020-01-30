@@ -36,6 +36,7 @@ type Opts struct {
 	EndCol    string `json:"end_col"`
 	// the suffix in the header to be removed
 	HeaderSuffix    string `json:"header_suffix"`
+	CacheTTL time.Duration `json:"cache_ttl"`
 }
 
 type sign struct {

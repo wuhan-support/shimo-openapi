@@ -196,7 +196,7 @@ func (c *Client) updateOrCreateCache(fileID string, opts Opts) (*Cache, error) {
 	}
 
 	cache := &Cache{
-		expire: time.Now().Add(time.Second * 60),
+		expire: time.Now().Add(opts.CacheTTL),
 		Opts:   opts,
 		result: r,
 	}
