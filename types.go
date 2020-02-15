@@ -39,6 +39,15 @@ type Opts struct {
 	CacheTTL time.Duration `json:"cache_ttl"`
 }
 
+type WriteOpts struct {
+	Range string `json:"range"`
+	Resource *WriteResource `json:"resource"`
+}
+
+type WriteResource struct {
+	Values [][]interface{} `json:"values"`
+}
+
 type sign struct {
 	Opts
 	FileID string
@@ -49,4 +58,17 @@ type Cache struct {
 	Opts
 	expire time.Time
 	result []byte
+}
+
+// Because the map data is unordered, 
+// you need to customize the order in which the fields are stored
+type WriteObj interface {
+	Values() []interface{}
+}
+
+func NewWriteOpts(sheetName string, v WriteObj) (*WriteOpts) {
+	w := &WriteOpts{ Range: sheetName, Resource: &WriteResource{} }
+	w.Resource.Values = make([][]interface{}, 0)
+	w.Resource.Values = append(w.Resource.Values, v.Values())
+	return w
 }

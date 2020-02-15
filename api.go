@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"path"
 	"time"
-
 	"github.com/wuhan-support/shimo-openapi/transform"
 )
 
@@ -138,9 +137,10 @@ func (c *Client) request(r *http.Request) ([]byte, error) {
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusOK &&
+		response.StatusCode != http.StatusNoContent {
 		i, _ := ioutil.ReadAll(response.Body)
-		return nil, fmt.Errorf("non-200 response received when getting docs: %v", string(i))
+		return nil, fmt.Errorf("request error: %d, %v", response.StatusCode, string(i))
 	}
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
@@ -162,6 +162,34 @@ func (c *Client) getFileFromAPI(fileID string, opts Opts) ([]byte, error) {
 		return nil, err
 	}
 	return transform.Transform(resp, opts.HeaderSuffix)
+}
+
+func (c *Client) UpdateFileFromAPI(fileID string, opts WriteOpts) error {
+	return c.writeFileFromAPI("POST", fileID, opts)
+}
+
+func (c *Client) AppendFileFromAPI(fileID string, opts WriteOpts) error {
+	return c.writeFileFromAPI("PUT", fileID, opts)
+}
+
+func (c *Client) writeFileFromAPI(method string, fileID string, opts WriteOpts) error {
+	u := path.Join("/files", fileID, "sheets/values")
+	u = fmt.Sprintf("%s%s", Endpoint, u)
+	jsonStr, err := json.Marshal(opts)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(method, u, bytes.NewReader(jsonStr))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	_, err = c.request(request)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) receiveSign() {
